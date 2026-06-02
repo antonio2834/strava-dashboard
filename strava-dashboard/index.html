@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans,sans-serif);background:#f5f5f5;color:#111;min-height:100vh}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+#auth-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:1.5rem;gap:1.5rem}
+.strava-logo{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:500}
+.strava-logo .dot{width:28px;height:28px;background:#FC4C02;border-radius:50%;flex-shrink:0}
+.auth-card{background:#fff;border:0.5px solid #ddd;border-radius:12px;padding:1.5rem;width:100%;max-width:420px;display:flex;flex-direction:column;gap:1rem;align-items:center;text-align:center}
+.auth-card h2{font-size:17px;font-weight:500}
+.auth-card p{font-size:13px;color:#666;line-height:1.6}
+.btn-strava{background:#FC4C02;color:#fff;border:none;padding:12px 20px;border-radius:8px;font-size:15px;font-weight:500;cursor:pointer;width:100%;display:flex;align-items:center;justify-content:center;gap:8px;-webkit-tap-highlight-color:transparent}
+.btn-strava:hover{background:#e04302}
+.error-msg{font-size:13px;color:#c0392b;background:#fdecea;padding:8px 12px;border-radius:8px;display:none;width:100%}
+#dashboard{display:none;padding:1rem;max-width:900px;margin:0 auto;flex-direction:column;gap:1rem}
+.top-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;position:sticky;top:0;z-index:100;background:#fff;padding:.75rem 1rem;margin:-1rem -1rem 0;border-bottom:0.5px solid #ddd;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
+.top-bar h1{font-size:20px;font-weight:500}
+.top-bar-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.athlete-info{font-size:13px;color:#666}
+.athlete-avatar{width:30px;height:30px;border-radius:50%;object-fit:cover;border:1.5px solid #ddd;flex-shrink:0}
+.metrics{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media(min-width:500px){.metrics{grid-template-columns:repeat(4,1fr)}}
+.metric-card{background:#f0f0f0;border-radius:8px;padding:.875rem;display:flex;flex-direction:column;gap:3px}
+.metric-card .label{font-size:11px;color:#888}
+.metric-card .value{font-size:20px;font-weight:500}
+.metric-card .sub{font-size:11px;color:#888}
+.section{background:#fff;border:0.5px solid #ddd;border-radius:12px;padding:1rem;display:flex;flex-direction:column;gap:.875rem}
+.section-header{display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.section-header h2{font-size:15px;font-weight:500}
+.filters-row{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}
+.filter-group{display:flex;flex-direction:column;gap:5px}
+.filter-group label{font-size:11px;color:#888}
+.filters{display:flex;gap:6px;flex-wrap:wrap}
+.filter-btn{font-size:12px;padding:5px 12px;cursor:pointer;border-radius:20px;border:0.5px solid #ccc;background:transparent;color:#666;-webkit-tap-highlight-color:transparent;white-space:nowrap}
+.filter-btn.active{background:#FC4C02;color:#fff;border-color:#FC4C02}
+select.filter-select{font-size:13px;padding:6px 10px;border-radius:8px;border:0.5px solid #ccc;background:#fafafa;color:#111}
+.chart-wrap{position:relative;width:100%}
+.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:#888}
+.legend span{display:flex;align-items:center;gap:4px}
+.legend .dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+.prs-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(min-width:600px){.prs-grid{grid-template-columns:repeat(4,1fr)}}
+.pr-card{background:#f5f5f5;border-radius:8px;padding:10px 12px}
+.pr-type{font-size:12px;color:#888;margin-bottom:4px;display:flex;align-items:center;gap:4px}
+.pr-val{font-size:16px;font-weight:500}
+.pr-date{font-size:11px;color:#888;margin-top:2px}
+.pr-badge{display:inline-block;background:#FC4C02;color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;margin-left:4px}
+.pr-row{cursor:pointer;padding:7px 8px;border-radius:8px;border:0.5px solid transparent;transition:border-color 0.15s;-webkit-tap-highlight-color:transparent}
+.pr-row:hover{border-color:#ccc}
+.loading{text-align:center;padding:2.5rem;color:#888;font-size:14px;display:flex;flex-direction:column;align-items:center;gap:12px}
+.spinner{width:26px;height:26px;border:3px solid #eee;border-top-color:#FC4C02;border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#side-panel{position:fixed;top:0;right:0;width:420px;max-width:100vw;height:100vh;height:100dvh;background:#fff;border-left:0.5px solid #ddd;box-shadow:-4px 0 24px rgba(0,0,0,0.08);transform:translateX(100%);transition:transform 0.3s ease;z-index:1000;display:flex;flex-direction:column;overflow:hidden}
+#side-panel.open{transform:translateX(0)}
+#panel-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.25);z-index:999;display:none;cursor:pointer}
+#panel-overlay.open{display:block}
+#panel-header{display:flex;align-items:flex-start;justify-content:space-between;padding:1rem;border-bottom:0.5px solid #ddd;gap:8px;flex-shrink:0}
+#panel-title{font-size:15px;font-weight:500;line-height:1.3}
+#panel-subtitle{font-size:13px;color:#888;margin-top:2px}
+#panel-close{background:none;border:0.5px solid #ccc;border-radius:8px;padding:8px 10px;cursor:pointer;flex-shrink:0;color:#666;font-size:16px;-webkit-tap-highlight-color:transparent}
+#panel-body{overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;display:flex;flex-direction:column;gap:1rem;padding:1rem;background:#fff}
+#panel-map{width:100%;height:180px;border-radius:8px;overflow:hidden;background:#eee}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stat-item{background:#f5f5f5;border-radius:8px;padding:10px 12px}
+.stat-item .s-label{font-size:11px;color:#888;margin-bottom:2px}
+.stat-item .s-val{font-size:17px;font-weight:500}
+.race-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:8px;border:0.5px solid #eee;cursor:pointer;transition:border-color 0.15s;-webkit-tap-highlight-color:transparent}
+.race-row:hover{border-color:#ccc}
+.race-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.race-info{flex:1;min-width:0}
+.race-name{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.race-meta{font-size:11px;color:#888;margin-top:1px}
+.race-stats{display:flex;gap:12px;flex-shrink:0}
+.race-stat{display:flex;flex-direction:column;align-items:flex-end;gap:1px}
+.race-stat .rs-val{font-size:13px;font-weight:500;color:#111}
+.race-stat .rs-lbl{font-size:10px;color:#aaa}
+</style>
+</head>
+<body>
+
+<div id="loading-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2000;align-items:center;justify-content:center;padding:1.5rem">
+  <div style="background:#fff;border-radius:16px;padding:2rem;max-width:340px;width:100%;display:flex;flex-direction:column;align-items:center;gap:1rem;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.2)">
+    <div class="spinner"></div>
+    <h3 style="font-size:16px;font-weight:500;color:#111">Obteniendo tus actividades…</h3>
+    <p style="font-size:13px;color:#666;line-height:1.6">Este proceso puede llevar unos segundos si tienes muchas actividades registradas en Strava.</p>
+    <div style="width:100%;height:4px;background:#eee;border-radius:2px;overflow:hidden">
+      <div id="loading-bar" style="height:100%;background:#FC4C02;border-radius:2px;width:0%;transition:width 0.4s ease"></div>
+    </div>
+    <span id="loading-count" style="font-size:12px;color:#888">Iniciando…</span>
+  </div>
+</div>
+
+<div id="panel-overlay" onclick="closePanel()"></div>
+<div id="side-panel">
+  <div id="panel-header">
+    <div><div id="panel-title">—</div><div id="panel-subtitle"></div></div>
+    <button id="panel-close" onclick="closePanel()">✕</button>
+  </div>
+  <div id="panel-body"></div>
+</div>
+
+<div id="auth-screen">
+  <div class="strava-logo"><div class="dot"></div>Mis métricas</div>
+  <div class="auth-card">
+    <h2>Bienvenido</h2>
+    <p>Conecta tu cuenta de Strava para ver tus estadísticas y récords personales.</p>
+    <div class="error-msg" id="error-msg"></div>
+    <button class="btn-strava" onclick="startOAuth()">Conectar con Strava</button>
+  </div>
+</div>
+
+<div id="dashboard">
+  <div class="top-bar">
+    <h1>Mis métricas</h1>
+    <div class="top-bar-right">
+      <span class="athlete-info" id="athlete-name"></span>
+      <img id="athlete-avatar" class="athlete-avatar" src="" alt="Avatar" style="display:none">
+      <button class="btn-strava" style="width:auto;padding:8px 16px;font-size:13px" onclick="logout()">Cerrar sesión</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header"><h2>Estadísticas anuales por tipo de actividad</h2></div>
+    <div class="filters-row">
+      <div class="filter-group">
+        <label>Métrica principal (barras)</label>
+        <div class="filters" id="yearly-metric-filters">
+          <button class="filter-btn active" data-metric="km">Kilómetros</button>
+          <button class="filter-btn" data-metric="elev">Desnivel</button>
+          <button class="filter-btn" data-metric="time">Tiempo</button>
+        </div>
+      </div>
+      <div class="filter-group">
+        <label>Métrica secundaria (línea)</label>
+        <div class="filters" id="yearly-metric2-filters">
+          <button class="filter-btn active" data-metric2="none">Ninguna</button>
+          <button class="filter-btn" data-metric2="km">Kilómetros</button>
+          <button class="filter-btn" data-metric2="elev">Desnivel</button>
+          <button class="filter-btn" data-metric2="time">Tiempo</button>
+        </div>
+      </div>
+      <div class="filter-group">
+        <label>Rango de años</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="year-from" class="filter-select"></select>
+          <span style="font-size:13px;color:#888">–</span>
+          <select id="year-to" class="filter-select"></select>
+        </div>
+      </div>
+      <div class="filter-group">
+        <label>Deportes</label>
+        <div id="yearly-type-filters" class="filters"></div>
+      </div>
+    </div>
+    <div id="yearly-legend" class="legend"></div>
+    <div id="yearly-legend2" class="legend" style="margin-top:2px"></div>
+    <div class="chart-wrap" style="height:240px"><canvas id="yearly-chart"></canvas></div>
+  </div>
+
+  <div class="section">
+    <div class="section-header"><h2>Datos último año</h2></div>
+    <div class="filters-row">
+      <div class="filter-group">
+        <label>Métrica</label>
+        <div class="filters" id="monthly-metric-filters">
+          <button class="filter-btn active" data-mmetric="km">Km acumulados</button>
+          <button class="filter-btn" data-mmetric="pace">Ritmo promedio</button>
+          <button class="filter-btn" data-mmetric="speed">Velocidad promedio</button>
+          <button class="filter-btn" data-mmetric="elev">Desnivel acumulado</button>
+        </div>
+      </div>
+      <div class="filter-group">
+        <label>Deportes</label>
+        <div class="filters" id="monthly-type-filters"></div>
+      </div>
+    </div>
+    <div id="monthly-legend" class="legend"></div>
+    <div class="chart-wrap" style="height:240px"><canvas id="monthly-chart"></canvas></div>
+  </div>
+
+  <div class="section">
+    <div class="section-header"><h2>Últimas pruebas</h2></div>
+    <div id="races-list" style="display:flex;flex-direction:column;gap:6px"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-header"><h2>Datos totales</h2></div>
+    <div id="metrics-row" class="metrics"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-header"><h2>Récords personales</h2></div>
+    <div class="prs-grid" id="prs-grid"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script>
+const STRAVA_CLIENT_ID = '180393'; // ← pon aquí tu Client ID (es público)
+const REDIRECT_URI=window.location.href.split('?')[0].split('#')[0];
+const SCOPE='read,activity:read_all';
+let allActivities=[];
+let panelMap=null,panelChart=null;
+
+function showError(msg){const e=document.getElementById('error-msg');e.textContent=msg;e.style.display='block';}
+
+function startOAuth(){
+  window.location.href=`https://www.strava.com/oauth/authorize?client_id=${STRAVA_CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&approval_prompt=auto&scope=${SCOPE}`;
+}
+function logout(){sessionStorage.clear();window.location.href=REDIRECT_URI;}
+
+async function exchangeCode(code){
+  const r=await fetch('/api/strava-token',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({code})
+  });
+  const d=await r.json();
+  if(d.access_token){
+    sessionStorage.setItem('strava_access_token',d.access_token);
+    sessionStorage.setItem('strava_athlete',JSON.stringify(d.athlete));
+    window.history.replaceState({},'',REDIRECT_URI);
+    loadDashboard(d.access_token,d.athlete);
+  } else {showAuthScreen();showError('Error de autenticación: '+(d.message||'Inténtalo de nuevo.'));}
+}={Run:'#FC4C02',Ride:'#3266ad',Swim:'#1D9E75',Walk:'#BA7517',Hike:'#639922',VirtualRide:'#A32D2D',WeightTraining:'#7F77DD',Other:'#73726c'};
+const activityLabels={Run:'Carrera',Ride:'Ciclismo',Swim:'Natación',Walk:'Caminar',Hike:'Senderismo',VirtualRide:'Ciclismo virtual',WeightTraining:'Musculación',Other:'Otras'};
+
+function actType(a){return a.sport_type||a.type||'Other';}
+function fmtPace(mps){if(!mps||mps<=0)return'—';const s=Math.round(1000/mps);return`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')} /km`;}
+function fmtDate(str){return new Date(str).toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'});}
+function fmtHours(h){const hh=Math.floor(h),mm=Math.round((h-hh)*60);return`${hh}h ${mm}min`;}
+function monthKey(a){const d=new Date(a.start_date);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;}
+
+function showError(msg){const e=document.getElementById('error-msg');e.textContent=msg;e.style.display='block';}
+function startOAuth(){
+  const cid=document.getElementById('client-id').value.trim();
+  const cs=document.getElementById('client-secret').value.trim();
+  if(!cid||!cs){showError('Introduce el Client ID y el Client Secret.');return;}
+  sessionStorage.setItem('strava_client_id',cid);
+  sessionStorage.setItem('strava_client_secret',cs);
+  window.location.href=`https://www.strava.com/oauth/authorize?client_id=${cid}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&approval_prompt=auto&scope=${SCOPE}`;
+}
+function logout(){sessionStorage.clear();window.location.href=REDIRECT_URI;}
+
+async function exchangeCode(code){
+  const cid=sessionStorage.getItem('strava_client_id'),cs=sessionStorage.getItem('strava_client_secret');
+  if(!cid||!cs){showAuthScreen();return;}
+  const r=await fetch('https://www.strava.com/oauth/token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({client_id:cid,client_secret:cs,code,grant_type:'authorization_code'})});
+  const d=await r.json();
+  if(d.access_token){
+    sessionStorage.setItem('strava_access_token',d.access_token);
+    sessionStorage.setItem('strava_athlete',JSON.stringify(d.athlete));
+    window.history.replaceState({},'',REDIRECT_URI);
+    loadDashboard(d.access_token,d.athlete);
+  } else {showAuthScreen();showError('Error de autenticación: '+(d.message||'Inténtalo de nuevo.'));}
+}
+
+async function fetchAllActivities(token){
+  const overlay=document.getElementById('loading-overlay');
+  const bar=document.getElementById('loading-bar');
+  const countEl=document.getElementById('loading-count');
+  overlay.style.display='flex';
+  let page=1,acts=[];
+  try{
+    while(true){
+      countEl.textContent=`Página ${page} — ${acts.length} actividades obtenidas…`;
+      bar.style.width=`${Math.min(90,(page-1)*12)}%`;
+      const r=await fetch(`https://www.strava.com/api/v3/athlete/activities?per_page=200&page=${page}`,{headers:{Authorization:`Bearer ${token}`}});
+      if(!r.ok){
+        if(r.status===401){countEl.textContent='Sesión expirada. Cierra sesión y vuelve a conectar.';bar.style.background='#e04302';return null;}
+        throw new Error(`HTTP ${r.status}`);
+      }
+      const d=await r.json();
+      if(!Array.isArray(d)||d.length===0)break;
+      acts=acts.concat(d);
+      if(d.length<200)break;
+      page++;
+    }
+  }catch(err){
+    countEl.textContent=`Error: ${err.message}`;
+    bar.style.background='#e04302';
+    bar.style.width='100%';
+    return null;
+  }
+  bar.style.width='100%';
+  countEl.textContent=`✓ ${acts.length} actividades cargadas`;
+  await new Promise(res=>setTimeout(res,700));
+  overlay.style.display='none';
+  return acts;
+}
+
+async function loadDashboard(token,athlete){
+  document.getElementById('auth-screen').style.display='none';
+  document.getElementById('dashboard').style.display='flex';
+  document.getElementById('athlete-name').textContent=`${athlete.firstname||''} ${athlete.lastname||''}`.trim();
+  if(athlete.profile){const av=document.getElementById('athlete-avatar');av.src=athlete.profile;av.style.display='block';}
+  allActivities=await fetchAllActivities(token);
+  if(!allActivities)return;
+  buildMetrics(allActivities);
+  buildYearlyChart(allActivities);
+  buildMonthlyChart(allActivities);
+  buildRaces(allActivities);
+  buildPRs(allActivities);
+}
+
+function buildMetrics(acts){
+  const totalKm=acts.reduce((s,a)=>s+(a.distance||0),0)/1000;
+  const totalTime=acts.reduce((s,a)=>s+(a.moving_time||0),0);
+  const totalElev=acts.reduce((s,a)=>s+(a.total_elevation_gain||0),0);
+  const types=new Set(acts.map(actType)).size;
+  const h=Math.floor(totalTime/3600),m=Math.floor((totalTime%3600)/60);
+  document.getElementById('metrics-row').innerHTML=`
+    <div class="metric-card"><div class="label">Kilómetros</div><div class="value">${totalKm.toLocaleString('es-ES',{maximumFractionDigits:0})}</div><div class="sub">km totales</div></div>
+    <div class="metric-card"><div class="label">Actividades</div><div class="value">${acts.length}</div><div class="sub">${types} tipo${types!==1?'s':''}</div></div>
+    <div class="metric-card"><div class="label">Tiempo total</div><div class="value">${h.toLocaleString('es-ES')}</div><div class="sub">h ${m}min</div></div>
+    <div class="metric-card"><div class="label">Desnivel</div><div class="value">${Math.round(totalElev).toLocaleString('es-ES')}</div><div class="sub">metros</div></div>`;
+}
+
+function getLast12Months(){
+  const labels=[],keys=[],now=new Date();
+  for(let i=11;i>=0;i--){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    keys.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+    labels.push(d.toLocaleDateString('es-ES',{month:'short',year:'2-digit'}));
+  }
+  return{labels,keys};
+}
+
+function buildYearlyChart(acts){
+  const allYears=[...new Set(acts.map(a=>new Date(a.start_date).getFullYear()))].sort();
+  const currentYear=new Date().getFullYear();
+  const types=[...new Set(acts.map(actType))].filter(t=>acts.some(a=>actType(a)===t&&(a.distance>0||a.total_elevation_gain>0||a.moving_time>0))).slice(0,8);
+  let selTypes=[...types],selMetric='km',selMetric2='none';
+  const metrics={
+    km:{label:v=>`${v.toFixed(1)} km`,get:a=>(a.distance||0)/1000,fmt:v=>`${v.toFixed(1)} km`},
+    elev:{label:v=>`${Math.round(v)} m`,get:a=>a.total_elevation_gain||0,fmt:v=>`${Math.round(v).toLocaleString('es-ES')} m`},
+    time:{label:v=>fmtHours(v),get:a=>(a.moving_time||0)/3600,fmt:v=>fmtHours(v)}
+  };
+  const fromSel=document.getElementById('year-from'),toSel=document.getElementById('year-to');
+  allYears.forEach(y=>{
+    fromSel.innerHTML+=`<option value="${y}"${y===currentYear-4?' selected':''}>${y}</option>`;
+    toSel.innerHTML+=`<option value="${y}"${y===currentYear?' selected':''}>${y}</option>`;
+  });
+  document.getElementById('yearly-metric-filters').querySelectorAll('.filter-btn').forEach(b=>{
+    b.onclick=()=>{if(b.dataset.metric===selMetric2)return;selMetric=b.dataset.metric;document.getElementById('yearly-metric-filters').querySelectorAll('.filter-btn').forEach(x=>x.className='filter-btn'+(x.dataset.metric===selMetric?' active':''));render();};
+  });
+  document.getElementById('yearly-metric2-filters').querySelectorAll('.filter-btn').forEach(b=>{
+    b.onclick=()=>{if(b.dataset.metric2===selMetric&&b.dataset.metric2!=='none')return;selMetric2=b.dataset.metric2;document.getElementById('yearly-metric2-filters').querySelectorAll('.filter-btn').forEach(x=>x.className='filter-btn'+(x.dataset.metric2===selMetric2?' active':''));render();};
+  });
+  const filtersEl=document.getElementById('yearly-type-filters');
+  types.forEach(t=>{
+    const b=document.createElement('button');
+    b.className='filter-btn active';b.textContent=activityLabels[t]||t;b.dataset.type=t;
+    b.onclick=()=>{
+      if(selTypes.includes(t))selTypes=selTypes.filter(x=>x!==t);else selTypes.push(t);
+      if(selTypes.length===0)selTypes=[t];
+      filtersEl.querySelectorAll('.filter-btn').forEach(x=>x.className='filter-btn'+(selTypes.includes(x.dataset.type)?' active':''));render();
+    };
+    filtersEl.appendChild(b);
+  });
+  function getTypeData(years,t,m){return years.map(y=>parseFloat(acts.filter(a=>actType(a)===t&&new Date(a.start_date).getFullYear()===y).reduce((s,a)=>s+m.get(a),0).toFixed(2)));}
+  function render(){
+    const m1=metrics[selMetric];
+    const from=parseInt(fromSel.value),to=parseInt(toSel.value);
+    const years=allYears.filter(y=>y>=from&&y<=to);
+    const active=types.filter(t=>selTypes.includes(t));
+    const datasets=[];
+    active.forEach(t=>{
+      const data=getTypeData(years,t,m1);if(!data.some(v=>v>0))return;
+      const col=activityColors[t]||'#aaa';
+      datasets.push({label:activityLabels[t]||t,data,backgroundColor:col+'bb',borderColor:col,borderWidth:1.5,borderRadius:3,type:'bar',yAxisID:'y1',_type:t,_m:1});
+    });
+    if(selMetric2!=='none'){
+      const m2=metrics[selMetric2];
+      active.forEach(t=>{
+        const data=getTypeData(years,t,m2);if(!data.some(v=>v>0))return;
+        const col=activityColors[t]||'#aaa';
+        datasets.push({label:activityLabels[t]||t,data,borderColor:col,backgroundColor:col+'22',borderWidth:2,pointRadius:3,tension:0.3,fill:false,type:'line',yAxisID:'y2',_type:t,_m:2});
+      });
+    }
+    const leg1=active.filter(t=>datasets.some(d=>d._type===t&&d._m===1&&d.data.some(v=>v>0)));
+    document.getElementById('yearly-legend').innerHTML=leg1.length?`<span style="font-size:11px;color:#888;margin-right:4px">Barras:</span>`+leg1.map(t=>`<span><span class="dot" style="background:${activityColors[t]||'#aaa'}"></span>${activityLabels[t]||t}</span>`).join(''):'';
+    if(selMetric2!=='none'){
+      const leg2=active.filter(t=>datasets.some(d=>d._type===t&&d._m===2&&d.data.some(v=>v>0)));
+      document.getElementById('yearly-legend2').innerHTML=leg2.length?`<span style="font-size:11px;color:#888;margin-right:4px">Línea:</span>`+leg2.map(t=>`<span><span style="display:inline-block;width:16px;height:2px;background:${activityColors[t]||'#aaa'};vertical-align:middle;margin-right:3px;border-radius:1px"></span>${activityLabels[t]||t}</span>`).join(''):'';
+    } else {document.getElementById('yearly-legend2').innerHTML='';}
+    const scales={x:{grid:{display:false},ticks:{font:{size:11}}},y1:{beginAtZero:true,position:'left',ticks:{callback:v=>m1.label(v),font:{size:10}},grid:{color:'rgba(128,128,128,0.1)'}}};
+    if(selMetric2!=='none')scales.y2={beginAtZero:true,position:'right',ticks:{callback:v=>metrics[selMetric2].label(v),font:{size:10}},grid:{display:false}};
+    if(window._yearlyChart)window._yearlyChart.destroy();
+    window._yearlyChart=new Chart(document.getElementById('yearly-chart'),{data:{labels:years.map(String),datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>{const m=c.dataset._m===2&&selMetric2!=='none'?metrics[selMetric2]:m1;return`${c.dataset.label}: ${m.fmt(c.parsed.y)}`;} } } },scales}});
+  }
+  fromSel.onchange=()=>{if(parseInt(fromSel.value)>parseInt(toSel.value))toSel.value=fromSel.value;render();};
+  toSel.onchange=()=>{if(parseInt(toSel.value)<parseInt(fromSel.value))fromSel.value=toSel.value;render();};
+  render();
+}
+
+function buildMonthlyChart(acts){
+  const types=[...new Set(acts.map(actType))].slice(0,6);
+  let selTypes=types.slice(0,3),selMetric='km';
+  let monthlyChart=null;
+  const metrics={
+    km:{label:v=>`${v.toFixed(1)} km`,tip:(t,v)=>`${activityLabels[t]||t}: ${v.toFixed(1)} km`,get:(key,t)=>acts.filter(a=>actType(a)===t&&monthKey(a)===key).reduce((s,a)=>s+(a.distance||0)/1000,0),reverse:false},
+    pace:{label:v=>{const m=Math.floor(v),s=Math.round((v-m)*60);return`${m}:${String(s).padStart(2,'0')}`;},tip:(t,v)=>{const m=Math.floor(v),s=Math.round((v-m)*60);return`${activityLabels[t]||t}: ${m}:${String(s).padStart(2,'0')} /km`;},get:(key,t)=>{const r=acts.filter(a=>actType(a)===t&&monthKey(a)===key&&a.average_speed>0);return r.length?r.reduce((s,a)=>s+(1000/a.average_speed/60),0)/r.length:null;},reverse:true},
+    speed:{label:v=>`${v.toFixed(1)} km/h`,tip:(t,v)=>`${activityLabels[t]||t}: ${v.toFixed(1)} km/h`,get:(key,t)=>{const r=acts.filter(a=>actType(a)===t&&monthKey(a)===key&&a.average_speed>0);return r.length?r.reduce((s,a)=>s+a.average_speed*3.6,0)/r.length:null;},reverse:false},
+    elev:{label:v=>`${Math.round(v)} m`,tip:(t,v)=>`${activityLabels[t]||t}: ${Math.round(v)} m`,get:(key,t)=>acts.filter(a=>actType(a)===t&&monthKey(a)===key).reduce((s,a)=>s+(a.total_elevation_gain||0),0),reverse:false}
+  };
+  const typeFiltersEl=document.getElementById('monthly-type-filters');
+  const allBtn=document.createElement('button');
+  allBtn.className='filter-btn'+(selTypes.length===types.length?' active':'');
+  allBtn.textContent='Todas';allBtn.dataset.type='__all';
+  allBtn.onclick=()=>{selTypes=[...types];updateTypeBtns();renderMonthly();};
+  typeFiltersEl.appendChild(allBtn);
+  types.forEach(t=>{
+    const b=document.createElement('button');
+    b.className='filter-btn'+(selTypes.includes(t)?' active':'');
+    b.textContent=activityLabels[t]||t;b.dataset.type=t;
+    b.onclick=()=>{
+      if(selTypes.includes(t))selTypes=selTypes.filter(x=>x!==t);else selTypes.push(t);
+      if(selTypes.length===0)selTypes=[t];
+      updateTypeBtns();renderMonthly();
+    };
+    typeFiltersEl.appendChild(b);
+  });
+  function updateTypeBtns(){
+    typeFiltersEl.querySelectorAll('.filter-btn').forEach(b=>{
+      if(b.dataset.type==='__all')b.className='filter-btn'+(selTypes.length===types.length?' active':'');
+      else b.className='filter-btn'+(selTypes.includes(b.dataset.type)?' active':'');
+    });
+  }
+  document.getElementById('monthly-metric-filters').querySelectorAll('.filter-btn').forEach(b=>{
+    b.onclick=()=>{selMetric=b.dataset.mmetric;document.getElementById('monthly-metric-filters').querySelectorAll('.filter-btn').forEach(x=>x.className='filter-btn'+(x.dataset.mmetric===selMetric?' active':''));renderMonthly();};
+  });
+  function renderMonthly(){
+    const{labels,keys}=getLast12Months();
+    const m=metrics[selMetric];
+    const datasets=types.filter(t=>selTypes.includes(t)).map(t=>{
+      const data=keys.map(k=>{const v=m.get(k,t);return(v===null||v===0)?null:parseFloat(v.toFixed(2));});
+      if(data.every(v=>v===null))return null;
+      const col=activityColors[t]||'#aaa';
+      return{label:activityLabels[t]||t,data,borderColor:col,backgroundColor:col+'33',fill:false,tension:0.3,pointRadius:3,borderWidth:2,spanGaps:true,_type:t};
+    }).filter(Boolean);
+    document.getElementById('monthly-legend').innerHTML=datasets.map(d=>`<span><span class="dot" style="background:${d.borderColor}"></span>${d.label}</span>`).join('');
+    if(monthlyChart)monthlyChart.destroy();
+    monthlyChart=new Chart(document.getElementById('monthly-chart'),{type:'line',data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.y===null?null:m.tip(c.dataset._type,c.parsed.y)}}},scales:{y:{reverse:m.reverse,beginAtZero:!m.reverse,ticks:{callback:m.label,font:{size:10}},grid:{color:'rgba(128,128,128,0.1)'}},x:{grid:{display:false},ticks:{autoSkip:true,maxTicksLimit:6,maxRotation:0,font:{size:10}}}}}});
+  }
+  renderMonthly();
+}
+
+function buildRaces(acts){
+  const el=document.getElementById('races-list');
+  const races=acts
+    .filter(a=>a.workout_type===1||a.workout_type===11)
+    .sort((a,b)=>new Date(b.start_date)-new Date(a.start_date))
+    .slice(0,10);
+  if(!races.length){
+    el.innerHTML='<p style="font-size:13px;color:#888">No se encontraron actividades etiquetadas como prueba.</p>';
+    return;
+  }
+  el.innerHTML=races.map(a=>{
+    const t=actType(a),col=activityColors[t]||'#aaa',lbl=activityLabels[t]||t;
+    const km=((a.distance||0)/1000).toFixed(1);
+    const h=Math.floor((a.moving_time||0)/3600),m=String(Math.floor(((a.moving_time||0)%3600)/60)).padStart(2,'0');
+    const elev=Math.round(a.total_elevation_gain||0);
+    const name=(a.name||'Actividad').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+    return `<div class="race-row" onclick="openActivity(${a.id},'${name}','${a.start_date}')">
+      <div class="race-dot" style="background:${col}"></div>
+      <div class="race-info">
+        <div class="race-name">${a.name||'Actividad'}</div>
+        <div class="race-meta">${lbl} · ${fmtDate(a.start_date)}</div>
+      </div>
+      <div class="race-stats">
+        <div class="race-stat"><div class="rs-val">${km} km</div><div class="rs-lbl">distancia</div></div>
+        <div class="race-stat"><div class="rs-val">${h}h ${m}m</div><div class="rs-lbl">tiempo</div></div>
+        <div class="race-stat"><div class="rs-val">+${elev} m</div><div class="rs-lbl">desnivel</div></div>
+        ${t==='Ride'||t==='VirtualRide'
+          ? `<div class="race-stat"><div class="rs-val">${a.average_speed?(a.average_speed*3.6).toFixed(1)+' km/h':'—'}</div><div class="rs-lbl">vel. media</div></div>`
+          : `<div class="race-stat"><div class="rs-val">${fmtPace(a.average_speed)}</div><div class="rs-lbl">ritmo medio</div></div>`
+        }
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function buildPRs(acts){
+  const prsEl=document.getElementById('prs-grid');
+  const count={};
+  acts.forEach(a=>{const t=actType(a);count[t]=(count[t]||0)+1;});
+  const prTypes=Object.entries(count).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([t])=>t);
+  const prByType={};
+  prTypes.forEach(t=>{prByType[t]={maxKm:{km:0,date:'',id:0},maxElev:{v:0,date:'',id:0},bestPace:{mps:0,date:'',id:0}};});
+  acts.forEach(a=>{
+    const t=actType(a);if(!prByType[t])return;
+    const km=(a.distance||0)/1000;
+    if(km>prByType[t].maxKm.km)prByType[t].maxKm={km,date:a.start_date,id:a.id};
+    const elev=a.total_elevation_gain||0;
+    if(elev>prByType[t].maxElev.v)prByType[t].maxElev={v:elev,date:a.start_date,id:a.id};
+    const spd=a.average_speed||0;
+    if(spd>prByType[t].bestPace.mps)prByType[t].bestPace={mps:spd,date:a.start_date,id:a.id};
+  });
+  const prRow=(label,val,date,id)=>`
+    <div class="pr-row" onclick="openActivity(${id},'${label}','${date}')">
+      <div style="font-size:11px;color:#888;margin-bottom:2px">${label}</div>
+      <div class="pr-val">${val} <span class="pr-badge">PR</span></div>
+      <div class="pr-date">${date?fmtDate(date):''}</div>
+    </div>`;
+  let html='';
+  prTypes.forEach(type=>{
+    const pr=prByType[type],col=activityColors[type]||'#aaa',lbl=activityLabels[type]||type;
+    html+=`<div class="pr-card">
+      <div class="pr-type"><span style="width:8px;height:8px;border-radius:50%;background:${col};display:inline-block;margin-right:4px"></span>${lbl}</div>
+      <div style="display:flex;flex-direction:column;gap:2px;margin-top:6px">
+        ${pr.maxKm.id?prRow('Actividad más larga',`${pr.maxKm.km.toFixed(1)} km`,pr.maxKm.date,pr.maxKm.id):''}
+        ${pr.maxElev.id?prRow('Mayor desnivel',`${Math.round(pr.maxElev.v).toLocaleString('es-ES')} m`,pr.maxElev.date,pr.maxElev.id):''}
+        ${pr.bestPace.id?prRow('Mejor ritmo',fmtPace(pr.bestPace.mps),pr.bestPace.date,pr.bestPace.id):''}
+      </div>
+    </div>`;
+  });
+  prsEl.innerHTML=html||'<p style="font-size:13px;color:#888">No se encontraron actividades.</p>';
+}
+
+function closePanel(){
+  document.getElementById('side-panel').classList.remove('open');
+  document.getElementById('panel-overlay').classList.remove('open');
+}
+
+function decodePoly(str){
+  let idx=0,lat=0,lng=0,coords=[];
+  while(idx<str.length){
+    let b,shift=0,result=0;
+    do{b=str.charCodeAt(idx++)-63;result|=(b&0x1f)<<shift;shift+=5;}while(b>=0x20);
+    lat+=(result&1)?~(result>>1):(result>>1);shift=0;result=0;
+    do{b=str.charCodeAt(idx++)-63;result|=(b&0x1f)<<shift;shift+=5;}while(b>=0x20);
+    lng+=(result&1)?~(result>>1):(result>>1);
+    coords.push([lat/1e5,lng/1e5]);
+  }
+  return coords;
+}
+
+async function openActivity(id,name,date){
+  document.getElementById('side-panel').classList.add('open');
+  document.getElementById('panel-overlay').classList.add('open');
+  document.getElementById('panel-title').innerHTML=`${name} <a href="https://www.strava.com/activities/${id}" target="_blank" style="font-size:12px;font-weight:400;color:#FC4C02;text-decoration:none;vertical-align:middle">Ver en Strava ↗</a>`;
+  document.getElementById('panel-subtitle').textContent=fmtDate(date);
+  const body=document.getElementById('panel-body');
+  body.innerHTML='<div class="loading"><div class="spinner"></div><span>Cargando actividad…</span></div>';
+  if(panelMap){panelMap.remove();panelMap=null;}
+  if(panelChart){panelChart.destroy();panelChart=null;}
+  const token=sessionStorage.getItem('strava_access_token');
+  const[actRes,streamRes]=await Promise.all([
+    fetch(`https://www.strava.com/api/v3/activities/${id}`,{headers:{Authorization:`Bearer ${token}`}}),
+    fetch(`https://www.strava.com/api/v3/activities/${id}/streams?keys=velocity_smooth,distance&key_by_type=true`,{headers:{Authorization:`Bearer ${token}`}})
+  ]);
+  const act=await actRes.json(),streams=await streamRes.json();
+  const km=((act.distance||0)/1000).toFixed(2);
+  const h=Math.floor((act.moving_time||0)/3600),m=Math.floor(((act.moving_time||0)%3600)/60);
+  body.innerHTML=`
+    <div id="panel-map"></div>
+    <div class="stat-grid">
+      <div class="stat-item"><div class="s-label">Distancia</div><div class="s-val">${km} km</div></div>
+      <div class="stat-item"><div class="s-label">Tiempo</div><div class="s-val">${h}h ${m}min</div></div>
+      <div class="stat-item"><div class="s-label">Ritmo medio</div><div class="s-val">${fmtPace(act.average_speed)}</div></div>
+      <div class="stat-item"><div class="s-label">Desnivel</div><div class="s-val">+${Math.round(act.total_elevation_gain||0)} m</div></div>
+      <div class="stat-item"><div class="s-label">FC media</div><div class="s-val">${act.average_heartrate?Math.round(act.average_heartrate)+' ppm':'—'}</div></div>
+      <div class="stat-item"><div class="s-label">FC máxima</div><div class="s-val">${act.max_heartrate?Math.round(act.max_heartrate)+' ppm':'—'}</div></div>
+      <div class="stat-item"><div class="s-label">Cadencia</div><div class="s-val">${act.average_cadence?Math.round(act.average_cadence*2)+' rpm':'—'}</div></div>
+      <div class="stat-item"><div class="s-label">Calorías</div><div class="s-val">${act.calories?act.calories+' kcal':'—'}</div></div>
+    </div>
+    <div style="font-size:13px;font-weight:500;color:#888">Ritmo a lo largo de la actividad</div>
+    <div id="panel-chart-wrap"><canvas id="panel-chart"></canvas></div>`;
+  if(act.map&&act.map.summary_polyline){
+    const coords=decodePoly(act.map.summary_polyline);
+    panelMap=L.map('panel-map',{zoomControl:true,attributionControl:false});
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(panelMap);
+    const poly=L.polyline(coords,{color:'#FC4C02',weight:3}).addTo(panelMap);
+    panelMap.fitBounds(poly.getBounds(),{padding:[10,10]});
+  } else {
+    document.getElementById('panel-map').innerHTML='<div style="height:180px;display:flex;align-items:center;justify-content:center;font-size:13px;color:#888">Mapa no disponible</div>';
+  }
+  if(streams.velocity_smooth&&streams.distance){
+    const vels=streams.velocity_smooth.data,dists=streams.distance.data;
+    const step=Math.max(1,Math.floor(vels.length/80));
+    const labels=[],paceData=[];
+    for(let i=0;i<vels.length;i+=step){
+      labels.push((dists[i]/1000).toFixed(1)+' km');
+      const v=vels[i];paceData.push(v>0?parseFloat((1000/v/60).toFixed(2)):null);
+    }
+    panelChart=new Chart(document.getElementById('panel-chart'),{type:'line',data:{labels,datasets:[{label:'Ritmo',data:paceData,borderColor:'#FC4C02',backgroundColor:'#FC4C0222',fill:true,tension:0.3,pointRadius:0,borderWidth:2,spanGaps:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>{const v=c.parsed.y;if(!v)return'—';const mm=Math.floor(v),ss=Math.round((v-mm)*60);return`${mm}:${String(ss).padStart(2,'0')} /km`;}}}},scales:{y:{reverse:true,ticks:{callback:v=>{const mm=Math.floor(v),ss=Math.round((v-mm)*60);return`${mm}:${String(ss).padStart(2,'0')}`;},font:{size:10}},grid:{color:'rgba(128,128,128,0.1)'}},x:{ticks:{maxTicksLimit:6,font:{size:10}},grid:{display:false}}}}});
+  } else {
+    document.getElementById('panel-chart-wrap').innerHTML='<div style="font-size:13px;color:#888;padding:.5rem 0">Datos de ritmo no disponibles</div>';
+  }
+}
+
+function showAuthScreen(){
+  document.getElementById('auth-screen').style.display='flex';
+  document.getElementById('dashboard').style.display='none';
+}
+
+(async function(){
+  const params=new URLSearchParams(window.location.search);
+  const code=params.get('code');
+  const token=sessionStorage.getItem('strava_access_token');
+  const athleteStr=sessionStorage.getItem('strava_athlete');
+  if(code){
+    document.getElementById('auth-screen').style.display='flex';
+    document.getElementById('auth-screen').innerHTML=`<div class="strava-logo"><div class="dot"></div>Mis métricas</div><div class="loading"><div class="spinner"></div><span>Autenticando…</span></div>`;
+    await exchangeCode(code);
+  } else if(token&&athleteStr){
+    try{loadDashboard(token,JSON.parse(athleteStr));}catch(e){showAuthScreen();}
+  } else {showAuthScreen();}
+})();
+</script>
+</body>
+</html>
